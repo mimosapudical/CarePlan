@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Care Plan MVP</title>
+  <link rel="stylesheet" href="/static/careplans/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <div class="eyebrow">Care Plan MVP</div>
+      <h1>Generate Care Plan</h1>
+      <p class="subtitle">A minimal runnable version: the frontend submits the request, the backend generates in memory, and the result is shown only after the status reaches completed.</p>
+
+      <form id="care-plan-form" class="form">
+        <div class="grid">
+          <label><span>Patient First Name</span><input name="patient_first_name" value="A"></label>
+          <label><span>Patient Last Name</span><input name="patient_last_name" value="B"></label>
+          <label><span>Referring Provider</span><input name="referring_provider" value="Dr. Smith"></label>
+          <label><span>Referring Provider NPI</span><input name="referring_provider_npi" value="1234567890"></label>
+          <label><span>Patient MRN</span><input name="patient_mrn" value="000123"></label>
+          <label><span>Patient Primary Diagnosis</span><input name="patient_primary_diagnosis" value="Generalized myasthenia gravis"></label>
+          <label class="wide"><span>Medication Name</span><input name="medication_name" value="IVIG"></label>
+          <label class="wide"><span>Additional Diagnosis</span><input name="additional_diagnosis" value="Hypertension, GERD"></label>
+          <label class="wide"><span>Medication history</span><input name="medication_history" value="Pyridostigmine, Prednisone"></label>
+          <label class="wide"><span>Patient Records</span><textarea name="patient_records" rows="6">Name: A.B. (Fictional)
+MRN: 00012345
+Primary diagnosis: Generalized myasthenia gravis
+Home meds: Pyridostigmine, Prednisone</textarea></label>
+        </div>
+        <button id="submit-btn" type="submit">Generate Care Plan</button>
+      </form>
+    </section>
+
+    <section class="panel result">
+      <div class="eyebrow">Result</div>
+      <div id="status" class="status">Waiting for submission</div>
+      <div class="actions">
+        <a id="download-link" class="download-link" href="#" download style="display:none;">Download Current Care Plan</a>
+      </div>
+      <pre id="output" class="output">The care plan appears only after generation is completed.</pre>
+    </section>
+
+    <section class="panel search">
+      <div class="eyebrow">Search</div>
+      <div class="search-bar">
+        <input id="search-input" type="text" value="" placeholder="Search patient / MRN / medication / provider">
+        <button id="search-btn" type="button">Search</button>
+      </div>
+      <div id="search-status" class="status">Enter a keyword to search in-memory care plans</div>
+      <div id="search-results" class="results"></div>
+    </section>
+  </main>
+
+  <script src="/static/careplans/app.js"></script>
+</body>
+</html>
