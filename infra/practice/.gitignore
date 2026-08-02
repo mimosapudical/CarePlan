@@ -1,0 +1,6 @@
+# Local Terraform state / build artifacts for this practice folder only.
+# Do not commit *.tfstate (may contain resource ids).
+*
+!*.tf
+!.gitignore
+!build/.gitkeep
