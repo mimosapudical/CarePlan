@@ -1,6 +1,7 @@
 import json
 
 from .debug_trace import debug_break
+from .exceptions import ValidationError
 from .models import CarePlan
 
 
@@ -9,9 +10,24 @@ def parse_payload(request):
         raw = json.loads(request.body.decode("utf-8"))
     else:
         raw = request.POST.dict()
-    # BP2: HTTP bytes/form → Python dict（仍是前端原始字段）
+    # BP2: HTTP bytes/form → Python dict (still raw frontend fields)
     debug_break("serializers.parse_payload — HTTP → raw dict", raw=raw)
     return raw
+
+
+def validate_provider_patient_fields(*, npi, mrn):
+    """Format checks for order/provider-patient flows. Raises ValidationError (400)."""
+    errors = {}
+    if not isinstance(npi, str) or not npi.isdigit() or len(npi) != 10:
+        errors["npi"] = "NPI must be exactly 10 digits"
+    if not isinstance(mrn, str) or len(mrn) != 6:
+        errors["mrn"] = "MRN must be exactly 6 characters"
+    if errors:
+        raise ValidationError(
+            message="Validation failed",
+            code="VALIDATION_ERROR",
+            detail=errors,
+        )
 
 
 def normalize_payload(payload):
@@ -35,7 +51,7 @@ def normalize_payload(payload):
         "medication_history": medication_history,
         "patient_records": payload.get("patient_records", ""),
     }
-    # BP3: 前端原始 dict → 后端规范 payload（字符串列表已拆开）
+    # BP3: raw frontend dict → normalized backend payload (comma lists split)
     debug_break(
         "serializers.normalize_payload — raw dict → normalized payload",
         before_additional=payload.get("additional_diagnosis"),

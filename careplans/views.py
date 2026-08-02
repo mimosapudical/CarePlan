@@ -15,7 +15,7 @@ def index(request):
 @csrf_exempt
 def create_care_plan(request):
     logging.info("create_care_plan: request received method=%s path=%s", request.method, request.path)
-    # BP1: urls.py 刚把请求路由到这个 view
+    # BP1: urls.py just routed the request to this view
     debug_break(
         "views.create_care_plan — entered from urls",
         method=request.method,
@@ -24,14 +24,14 @@ def create_care_plan(request):
     )
 
     payload = serializers.normalize_payload(serializers.parse_payload(request))
-    # BP4: serializers 已把 HTTP body 转成业务 payload，准备交给 services
+    # BP4: serializers turned the HTTP body into a business payload for services
     debug_break(
         "views.create_care_plan — after serializers, before services",
         payload=payload,
     )
 
     record, queued = services.create_care_plan(payload)
-    # BP6: services 已写库并入队，准备组装 HTTP 响应
+    # BP6: services wrote to the DB and enqueued; about to build the HTTP response
     debug_break(
         "views.create_care_plan — after services, before response",
         careplan_id=str(record.id),

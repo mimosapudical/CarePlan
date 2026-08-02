@@ -31,12 +31,19 @@ WSGI_APPLICATION = "careplan_mvp.wsgi.application"
 
 INSTALLED_APPS = [
     "django.contrib.staticfiles",
+    "rest_framework",
     "careplans",
 ]
 
 MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
+    "careplans.exception_handler.AppExceptionMiddleware",
 ]
+
+REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "careplans.exception_handler.exception_handler",
+    "UNAUTHENTICATED_USER": None,
+}
 
 TEMPLATES = [
     {
