@@ -11,7 +11,7 @@
     <section class="panel">
       <div class="eyebrow">Care Plan MVP</div>
       <h1>Generate Care Plan</h1>
-      <p class="subtitle">A minimal runnable version: the frontend submits the request, the backend generates in memory, and the result is shown only after the status reaches completed.</p>
+      <p class="subtitle">A minimal runnable version: the frontend submits the request, the backend stores it as pending and enqueues the ID in Redis, then returns immediately.</p>
 
       <form id="care-plan-form" class="form">
         <div class="grid">
@@ -39,7 +39,7 @@ Home meds: Pyridostigmine, Prednisone</textarea></label>
       <div class="actions">
         <a id="download-link" class="download-link" href="#" download style="display:none;">Download Current Care Plan</a>
       </div>
-      <pre id="output" class="output">The care plan appears only after generation is completed.</pre>
+      <pre id="output" class="output">After submit you will see a receipt message and care plan ID. Queue processing comes later.</pre>
     </section>
 
     <section class="panel search">

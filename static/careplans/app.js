@@ -61,8 +61,8 @@ function renderSearchResults(results) {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   submitBtn.disabled = true;
-  statusEl.textContent = "processing...";
-  outputEl.textContent = "Generating, please wait...";
+  statusEl.textContent = "submitting...";
+  outputEl.textContent = "Submitting, please wait...";
 
   try {
     const response = await fetch("/api/care-plans/", {
@@ -71,8 +71,16 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify(formDataToObject(form)),
     });
     const data = await response.json();
-    statusEl.textContent = `status: ${data.status} | history: ${data.history.join(" -> ")}`;
-    renderCarePlan(data);
+    if (!response.ok) {
+      statusEl.textContent = `failed: ${data.status || response.status}`;
+      outputEl.textContent = data.error || "request failed";
+      downloadLink.style.display = "none";
+      return;
+    }
+
+    statusEl.textContent = `status: ${data.status}`;
+    outputEl.textContent = `${data.message}\nCare Plan ID: ${data.careplan_id}`;
+    downloadLink.style.display = "none";
   } catch (error) {
     statusEl.textContent = "failed";
     outputEl.textContent = String(error);

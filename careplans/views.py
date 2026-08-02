@@ -1,13 +1,13 @@
 import json
 import logging
-import uuid
 
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from .generator import generate_care_plan
-from .store import CARE_PLAN_STORE, STORE_LOCK, CarePlanRecord
+from .models import CarePlan
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +18,15 @@ def index(request):
 
 def _record_to_dict(record):
     return {
-        "id": record.id,
+        "id": str(record.id),
         "status": record.status,
         "history": record.history,
         "payload": record.payload,
         "care_plan": record.care_plan if record.status == "completed" else None,
         "error": record.error,
+        "queued_at": record.queued_at.isoformat() if record.queued_at else None,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
     }
 
 
@@ -83,6 +86,13 @@ def _normalize_payload(payload):
     }
 
 
+def _enqueue_care_plan(careplan_id):
+    import redis
+
+    client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    client.lpush(settings.CAREPLAN_QUEUE_NAME, str(careplan_id))
+
+
 @csrf_exempt
 def create_care_plan(request):
     logging.info("create_care_plan: request received method=%s path=%s", request.method, request.path)
@@ -95,49 +105,42 @@ def create_care_plan(request):
         len(payload.get("medication_history", [])),
         bool(payload.get("patient_records")),
     )
-    plan_id = uuid.uuid4().hex
-    record = CarePlanRecord(id=plan_id, payload=payload)
 
-    with STORE_LOCK:
-        record.status = "pending"
-        record.history.append("pending")
-        CARE_PLAN_STORE[plan_id] = record
-    logging.info("create_care_plan: record created plan_id=%s status=%s", plan_id, record.status)
+    record = CarePlan.objects.create(
+        status=CarePlan.STATUS_PENDING,
+        history=[CarePlan.STATUS_PENDING],
+        payload=payload,
+    )
+    logging.info("create_care_plan: record created careplan_id=%s status=%s", record.id, record.status)
 
     try:
-        with STORE_LOCK:
-            record.status = "processing"
-            record.history.append("processing")
-        logging.info("create_care_plan: calling generate_care_plan plan_id=%s", plan_id)
-
-        care_plan = generate_care_plan(payload)
-        logging.info(
-            "create_care_plan: generate_care_plan returned plan_id=%s sections=%s",
-            plan_id,
-            list(care_plan.keys()),
-        )
-
-        with STORE_LOCK:
-            record.status = "completed"
-            record.history.append("completed")
-            record.care_plan = care_plan
-        logging.info("create_care_plan: record completed plan_id=%s status=%s", plan_id, record.status)
+        _enqueue_care_plan(record.id)
+        record.queued_at = timezone.now()
+        record.save(update_fields=["queued_at", "updated_at"])
+        logging.info("create_care_plan: enqueued careplan_id=%s queue=%s", record.id, settings.CAREPLAN_QUEUE_NAME)
     except Exception as exc:
-        logger.exception("create_care_plan: failed plan_id=%s", plan_id)
-        with STORE_LOCK:
-            record.status = "failed"
-            record.history.append("failed")
-            record.error = str(exc)
+        logger.exception("create_care_plan: enqueue failed careplan_id=%s", record.id)
+        record.status = CarePlan.STATUS_FAILED
+        record.history = [*record.history, CarePlan.STATUS_FAILED]
+        record.error = f"Failed to enqueue care plan: {exc}"
+        record.save(update_fields=["status", "history", "error", "updated_at"])
+        return JsonResponse(_record_to_dict(record), status=503)
 
-    logging.info("create_care_plan: response ready plan_id=%s status=%s", plan_id, record.status)
-    return JsonResponse(_record_to_dict(record))
+    logging.info("create_care_plan: response ready careplan_id=%s status=%s", record.id, record.status)
+    return JsonResponse(
+        {
+            "message": "已收到",
+            "careplan_id": str(record.id),
+            "status": record.status,
+        },
+        status=202,
+    )
 
 
 def get_care_plan(request, plan_id):
-    with STORE_LOCK:
-        record = CARE_PLAN_STORE.get(plan_id)
-
-    if not record:
+    try:
+        record = CarePlan.objects.get(id=plan_id)
+    except CarePlan.DoesNotExist:
         return JsonResponse({"error": "not found"}, status=404)
 
     return JsonResponse(_record_to_dict(record))
@@ -145,15 +148,12 @@ def get_care_plan(request, plan_id):
 
 def search_care_plans(request):
     query = request.GET.get("q", "").lower()
-    with STORE_LOCK:
-        records = list(CARE_PLAN_STORE.values())
-
     results = []
-    for record in records:
+    for record in CarePlan.objects.all():
         payload = record.payload
         haystack = " ".join(
             [
-                record.id,
+                str(record.id),
                 record.status,
                 payload.get("patient_first_name", ""),
                 payload.get("patient_last_name", ""),
@@ -173,10 +173,9 @@ def search_care_plans(request):
 
 
 def download_care_plan(request, plan_id):
-    with STORE_LOCK:
-        record = CARE_PLAN_STORE.get(plan_id)
-
-    if not record:
+    try:
+        record = CarePlan.objects.get(id=plan_id)
+    except CarePlan.DoesNotExist:
         return JsonResponse({"error": "not found"}, status=404)
 
     response = HttpResponse(content_type="text/plain; charset=utf-8")

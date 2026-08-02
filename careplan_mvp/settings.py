@@ -53,6 +53,20 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("POSTGRES_DB", "careplan"),
+        "USER": os.environ.get("POSTGRES_USER", "careplan"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "careplan"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+    }
+}
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CAREPLAN_QUEUE_NAME = os.environ.get("CAREPLAN_QUEUE_NAME", "careplan_queue")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
