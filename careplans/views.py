@@ -140,6 +140,25 @@ def get_care_plan(request, plan_id):
     return JsonResponse(_record_to_dict(record))
 
 
+def get_care_plan_status(request, plan_id):
+    """Lightweight status endpoint for frontend polling."""
+    if request.method != "GET":
+        return JsonResponse({"error": "method not allowed"}, status=405)
+
+    try:
+        record = CarePlan.objects.get(id=plan_id)
+    except (CarePlan.DoesNotExist, ValidationError, ValueError):
+        return JsonResponse({"error": "not found"}, status=404)
+
+    response = {
+        "id": str(record.id),
+        "status": record.status,
+        "content": record.care_plan if record.status == CarePlan.STATUS_COMPLETED else None,
+        "error": record.error if record.status == CarePlan.STATUS_FAILED else None,
+    }
+    return JsonResponse(response)
+
+
 def search_care_plans(request):
     query = request.GET.get("q", "").lower()
     results = []
