@@ -54,5 +54,21 @@ services:
     ports:
       - "6379:6379"
 
+  test:
+    build: .
+    command: pytest -q
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    environment:
+      <<: *app-env
+      DJANGO_SETTINGS_MODULE: careplan_mvp.settings
+    depends_on:
+      - postgres
+      - redis
+    profiles:
+      - test
+
 volumes:
   postgres_data:

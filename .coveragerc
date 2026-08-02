@@ -1,0 +1,19 @@
+[run]
+branch = True
+source = careplans
+omit =
+    */migrations/*
+    */management/*
+    careplans/generator.py
+    careplans/tasks.py
+    careplans/store.py
+    careplans/debug_trace.py
+    careplans/apps.py
+
+[report]
+show_missing = True
+skip_covered = False
+fail_under = 90
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
