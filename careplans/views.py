@@ -1,13 +1,14 @@
 import json
 import logging
 
-from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import CarePlan
+from .tasks import generate_care_plan_task
 
 logger = logging.getLogger(__name__)
 
@@ -86,13 +87,6 @@ def _normalize_payload(payload):
     }
 
 
-def _enqueue_care_plan(careplan_id):
-    import redis
-
-    client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-    client.lpush(settings.CAREPLAN_QUEUE_NAME, str(careplan_id))
-
-
 @csrf_exempt
 def create_care_plan(request):
     logging.info("create_care_plan: request received method=%s path=%s", request.method, request.path)
@@ -114,10 +108,10 @@ def create_care_plan(request):
     logging.info("create_care_plan: record created careplan_id=%s status=%s", record.id, record.status)
 
     try:
-        _enqueue_care_plan(record.id)
+        generate_care_plan_task.delay(str(record.id))
         record.queued_at = timezone.now()
         record.save(update_fields=["queued_at", "updated_at"])
-        logging.info("create_care_plan: enqueued careplan_id=%s queue=%s", record.id, settings.CAREPLAN_QUEUE_NAME)
+        logging.info("create_care_plan: celery task queued careplan_id=%s", record.id)
     except Exception as exc:
         logger.exception("create_care_plan: enqueue failed careplan_id=%s", record.id)
         record.status = CarePlan.STATUS_FAILED
@@ -129,7 +123,7 @@ def create_care_plan(request):
     logging.info("create_care_plan: response ready careplan_id=%s status=%s", record.id, record.status)
     return JsonResponse(
         {
-            "message": "已收到",
+            "message": "Received",
             "careplan_id": str(record.id),
             "status": record.status,
         },
@@ -140,7 +134,7 @@ def create_care_plan(request):
 def get_care_plan(request, plan_id):
     try:
         record = CarePlan.objects.get(id=plan_id)
-    except CarePlan.DoesNotExist:
+    except (CarePlan.DoesNotExist, ValidationError, ValueError):
         return JsonResponse({"error": "not found"}, status=404)
 
     return JsonResponse(_record_to_dict(record))
@@ -175,7 +169,7 @@ def search_care_plans(request):
 def download_care_plan(request, plan_id):
     try:
         record = CarePlan.objects.get(id=plan_id)
-    except CarePlan.DoesNotExist:
+    except (CarePlan.DoesNotExist, ValidationError, ValueError):
         return JsonResponse({"error": "not found"}, status=404)
 
     response = HttpResponse(content_type="text/plain; charset=utf-8")

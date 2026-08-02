@@ -1,18 +1,39 @@
+x-app-env: &app-env
+  POSTGRES_DB: careplan
+  POSTGRES_USER: careplan
+  POSTGRES_PASSWORD: careplan
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  REDIS_URL: redis://redis:6379/0
+  CAREPLAN_QUEUE_NAME: careplan_queue
+  GOOGLE_APPLICATION_CREDENTIALS: /gcp/application_default_credentials.json
+
 services:
   web:
     build: .
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     volumes:
       - .:/app
+      - ${APPDATA}/gcloud/application_default_credentials.json:/gcp/application_default_credentials.json:ro
     environment:
-      POSTGRES_DB: careplan
-      POSTGRES_USER: careplan
-      POSTGRES_PASSWORD: careplan
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      REDIS_URL: redis://redis:6379/0
-      CAREPLAN_QUEUE_NAME: careplan_queue
+      <<: *app-env
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build: .
+    command: celery -A careplan_mvp worker --loglevel=info
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - ${APPDATA}/gcloud/application_default_credentials.json:/gcp/application_default_credentials.json:ro
+    environment:
+      <<: *app-env
     depends_on:
       - postgres
       - redis
