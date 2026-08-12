@@ -1,0 +1,10 @@
+apiVersion: careplan.example.io/v1alpha1
+kind: CarePlanJob
+metadata:
+  name: careplan-00000000000000000000000000000001
+  namespace: default
+spec:
+  carePlanId: "00000000-0000-0000-0000-000000000001"
+  image: careplan:test
+  backoffLimit: 3
+

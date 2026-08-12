@@ -6,6 +6,7 @@ x-app-env: &app-env
   POSTGRES_PORT: 5432
   REDIS_URL: redis://redis:6379/0
   CAREPLAN_QUEUE_NAME: careplan_queue
+  CAREPLAN_EXECUTION_BACKEND: celery
   GOOGLE_APPLICATION_CREDENTIALS: /gcp/application_default_credentials.json
 
 services:

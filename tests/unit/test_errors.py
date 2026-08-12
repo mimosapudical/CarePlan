@@ -271,18 +271,19 @@ def test_drf_handler_base_app_exception():
 
 @pytest.mark.django_db
 def test_create_care_plan_enqueue_success():
-    with patch("careplans.services.generate_care_plan_task") as task:
-        task.delay = MagicMock()
+    backend = MagicMock()
+    with patch("careplans.services.get_execution_backend", return_value=backend):
         record, queued = create_care_plan({"patient_mrn": "X", "medication_name": "M"})
         assert queued is True
         assert record.status == "pending"
-        task.delay.assert_called_once()
+        backend.submit.assert_called_once_with(str(record.id))
 
 
 @pytest.mark.django_db
 def test_create_care_plan_enqueue_failure():
-    with patch("careplans.services.generate_care_plan_task") as task:
-        task.delay.side_effect = RuntimeError("broker down")
+    backend = MagicMock()
+    backend.submit.side_effect = RuntimeError("broker down")
+    with patch("careplans.services.get_execution_backend", return_value=backend):
         record, queued = create_care_plan({"patient_mrn": "Y"})
         assert queued is False
         assert record.status == "failed"
@@ -291,8 +292,8 @@ def test_create_care_plan_enqueue_failure():
 
 @pytest.mark.django_db
 def test_get_and_search_care_plans():
-    with patch("careplans.services.generate_care_plan_task") as task:
-        task.delay = MagicMock()
+    backend = MagicMock()
+    with patch("careplans.services.get_execution_backend", return_value=backend):
         record, _ = create_care_plan(
             {
                 "patient_first_name": "Ann",

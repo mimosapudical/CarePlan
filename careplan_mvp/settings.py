@@ -60,19 +60,33 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "careplan"),
-        "USER": os.environ.get("POSTGRES_USER", "careplan"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "careplan"),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+USE_SQLITE = os.environ.get("CAREPLAN_USE_SQLITE", "").strip().lower() in {"1", "true", "yes"}
+
+if USE_SQLITE:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "test.sqlite3",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB", "careplan"),
+            "USER": os.environ.get("POSTGRES_USER", "careplan"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "careplan"),
+            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
+    }
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CAREPLAN_QUEUE_NAME = os.environ.get("CAREPLAN_QUEUE_NAME", "careplan_queue")
+CAREPLAN_EXECUTION_BACKEND = os.environ.get("CAREPLAN_EXECUTION_BACKEND", "celery")
+CAREPLAN_K8S_NAMESPACE = os.environ.get("CAREPLAN_K8S_NAMESPACE", "default")
+CAREPLAN_K8S_IMAGE = os.environ.get("CAREPLAN_K8S_IMAGE", "")
+CAREPLAN_K8S_BACKOFF_LIMIT = int(os.environ.get("CAREPLAN_K8S_BACKOFF_LIMIT", "3"))
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", REDIS_URL)

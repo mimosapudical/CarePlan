@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: careplan-operator
+  namespace: system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: careplan-operator
+  template:
+    metadata:
+      labels:
+        app: careplan-operator
+    spec:
+      serviceAccountName: careplan-operator
+      containers:
+        - name: manager
+          image: careplan-operator:latest
+          command:
+            - /manager
+          args:
+            - --leader-elect
+          ports:
+            - containerPort: 8080
+              name: metrics
+

@@ -181,8 +181,8 @@ def test_invalid_input_through_orchestrator_maps_to_validation():
 
 @pytest.mark.django_db
 def test_careplan_api_create_status_search_download(api_client):
-    with patch("careplans.services.generate_care_plan_task") as task:
-        task.delay = MagicMock()
+    backend = MagicMock()
+    with patch("careplans.services.get_execution_backend", return_value=backend):
         create = api_client.post(
             "/api/care-plans/",
             data=json.dumps(
@@ -199,6 +199,7 @@ def test_careplan_api_create_status_search_download(api_client):
         )
     assert create.status_code == 202
     plan_id = create.json()["careplan_id"]
+    backend.submit.assert_called_once_with(plan_id)
 
     detail = api_client.get(f"/api/care-plans/{plan_id}/")
     assert detail.status_code == 200
@@ -244,8 +245,9 @@ def test_careplan_api_create_status_search_download(api_client):
 
 @pytest.mark.django_db
 def test_careplan_enqueue_failure_returns_503(api_client):
-    with patch("careplans.services.generate_care_plan_task") as task:
-        task.delay.side_effect = RuntimeError("down")
+    backend = MagicMock()
+    backend.submit.side_effect = RuntimeError("down")
+    with patch("careplans.services.get_execution_backend", return_value=backend):
         response = api_client.post(
             "/api/care-plans/",
             data=json.dumps({"patient_mrn": "FAIL01"}),

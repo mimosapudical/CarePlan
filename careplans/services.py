@@ -5,8 +5,8 @@ from django.utils import timezone
 
 from .debug_trace import debug_break
 from .exceptions import BlockError, WarningException
+from .execution import get_execution_backend
 from .models import CarePlan, Order, Patient, Provider
-from .tasks import generate_care_plan_task
 
 logger = logging.getLogger(__name__)
 
@@ -151,10 +151,15 @@ def create_care_plan(payload):
     logging.info("create_care_plan: record created careplan_id=%s status=%s", record.id, record.status)
 
     try:
-        generate_care_plan_task.delay(str(record.id))
+        backend = get_execution_backend()
+        backend.submit(str(record.id))
         record.queued_at = timezone.now()
         record.save(update_fields=["queued_at", "updated_at"])
-        logging.info("create_care_plan: celery task queued careplan_id=%s", record.id)
+        logging.info(
+            "create_care_plan: execution backend queued careplan_id=%s backend=%s",
+            record.id,
+            backend.__class__.__name__,
+        )
     except Exception as exc:
         logger.exception("create_care_plan: enqueue failed careplan_id=%s", record.id)
         record.status = CarePlan.STATUS_FAILED

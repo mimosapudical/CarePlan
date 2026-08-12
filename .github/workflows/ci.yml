@@ -66,3 +66,27 @@ jobs:
 
       - name: Run pytest
         run: pytest -q
+
+  operator:
+    name: Go operator tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: operator
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: operator/go.sum
+
+      - name: Run go test
+        run: go test ./...
+
+      - name: Run go vet
+        run: go vet ./...

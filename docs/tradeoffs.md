@@ -1,6 +1,6 @@
 # Engineering tradeoffs
 
-Decisions that shaped CarePlan’s current shape, and what we would change next.
+Decisions that shaped CarePlan's current shape, and what we would change next.
 
 ## Why asynchronous processing
 
@@ -10,47 +10,57 @@ Care-plan generation calls an LLM and can take seconds to tens of seconds. Doing
 - Force clients to hold long connections open
 - Make retries harder without duplicating user-facing timeouts
 
-Accept → enqueue → process → poll (or fetch by id) keeps the write path fast and isolates failure/retry in the worker.
+Accept -> enqueue -> process -> poll (or fetch by id) keeps the write path fast and isolates failure/retry in the worker.
 
-## Why Celery + Redis locally
+## Why introduce an execution boundary
 
-Local and Docker need a durable-enough queue without standing up AWS.
+The business service previously called Celery `.delay()` directly even though runtime execution is an infrastructure concern. A tiny `ExecutionBackend` boundary lets the same service submit work to Celery or Kubernetes without knowing the runtime mechanism.
 
-| Choice | Rationale |
-|--------|-----------|
-| Celery | Familiar Python worker model; retries and backoff map cleanly to generation failures |
-| Redis | Lightweight broker for Compose; enough for a single-dev / MVP worker |
+## Why keep Celery
 
-This mirrors the cloud pattern (queue + worker) without requiring SQS during day-to-day development.
+Celery is still the simplest path for local and small deployments, and the existing application already supports it well.
 
-## Why Terraform / Infrastructure as Code
+## Why Kubernetes
 
-Manual console setup does not reproduce:
+For Kubernetes-hosted environments, a controller provides workload lifecycle through desired-state reconciliation. The custom resource expresses intent; the controller materializes the child `Job`.
 
-- Who created which resource, with which IAM and triggers
-- Repeatable apply/destroy for practice accounts
-- Reviewable diffs when wiring changes (API Gateway ↔ Lambda ↔ SQS ↔ RDS)
+## Why not say Kubernetes is better
 
-Terraform under `infra/practice/` encodes those relationships so the team can recreate or tear down the stack from git. IaC is the source of truth for cloud topology; the console is for inspection, not for primary provisioning.
+Celery, AWS, and Kubernetes solve different operational problems. The right choice depends on the runtime you are already running.
+
+## Why CarePlanJob references a database ID
+
+The medical/application payload stays in PostgreSQL rather than being duplicated into Kubernetes metadata. The CR only needs the work identifier and runtime metadata.
+
+## Why the Go controller does not generate care plans
+
+Runtime orchestration stays separate from Python domain behavior. Python owns the generation logic; Go owns resource reconciliation.
+
+## Why deterministic Job names
+
+Reconciliation is repeated. Deterministic identity lets the controller check for an existing child `Job` and remain idempotent.
+
+## Why owner references
+
+Owner references express resource ownership and let Kubernetes garbage collection remove the child `Job` when the `CarePlanJob` is deleted.
+
+## Why Kubernetes Job owns retries
+
+Avoid nested retries between the controller, the `Job`, and application code. Celery retains its own retry semantics; Kubernetes uses `backoffLimit`.
 
 ## Current limitations
 
-- AWS Lambdas in the practice module may still use **stub handlers**; full Django packaging on Lambda is incomplete.
-- Practice RDS is oriented toward learning (e.g. public access options); **not** production hardening (private subnets, least-privilege SG, Secrets Manager, etc.).
-- Local Django HTTP API and AWS HTTP API paths are **parallel surfaces**, not yet a single deployed artifact.
-- Terraform state is **local** to the practice folder — no remote backend / locking for a multi-engineer team.
-- Cloud stack is **ephemeral by policy**; there is no long-lived shared staging environment in-repo.
+- AWS Lambdas in the practice module may still use stub handlers; full Django packaging on Lambda is incomplete.
+- Practice RDS is oriented toward learning, not production hardening.
+- Local Django HTTP API and AWS HTTP API paths are parallel surfaces, not yet a single deployed artifact.
+- Terraform state is local to the practice folder.
+- Cloud stack is ephemeral by policy.
 
 ## Future improvements
 
-- Package real handlers (or container images) for Lambda and share `careplans/` domain code end to end on AWS
+- Package real handlers or container images for Lambda and share `careplans/` domain code end to end on AWS
 - Put Lambdas in a VPC; lock RDS to Lambda security groups; store DB credentials in Secrets Manager
-- Remote Terraform state (S3 + DynamoDB lock) and environment separation (dev/stage)
+- Remote Terraform state and environment separation
 - Unify API contracts between Django and API Gateway where it makes sense
-- Observability on the cloud path (structured logs, metrics, alarms) beyond local Prometheus profile
+- Observability on the cloud path beyond local logging
 
-## Related docs
-
-- [architecture.md](architecture.md)
-- [deployment.md](deployment.md)
-- [engineering-notes/day15.md](engineering-notes/day15.md)
