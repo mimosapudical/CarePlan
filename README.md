@@ -54,6 +54,8 @@ Apply and destroy from that directory (requires AWS credentials and `TF_VAR_db_p
 | Doc | Contents |
 | --- | --- |
 | [docs/architecture.md](docs/architecture.md) | Backend shape and request flow |
+| [docs/openapi.yaml](docs/openapi.yaml) | Client-facing Django HTTP contract |
+| [docs/adr/0001-explicit-openapi-contract.md](docs/adr/0001-explicit-openapi-contract.md) | Why the contract is explicit and CI-checked |
 | [docs/deployment.md](docs/deployment.md) | Docker local + Terraform cloud |
 | [docs/tradeoffs.md](docs/tradeoffs.md) | Why these choices, limits, next steps |
 | [care_plan_design_doc.md](care_plan_design_doc.md) | Product / domain design |
@@ -118,6 +120,15 @@ TablePlus local connection:
 - `GET /api/care-plans/<id>/`
 - `GET /api/care-plans/<id>/status/`
 
+The Django API contract is documented in [docs/openapi.yaml](docs/openapi.yaml).
+
+Validate the API contract locally:
+
+```bash
+python scripts/validate_openapi.py
+pytest tests/contract -q
+```
+
 `POST /api/care-plans/` stores `status='pending'`, submits work through the configured execution backend, and returns `202 Accepted` immediately.
 
 Celery remains the default backend. Kubernetes is an alternate backend that creates a `CarePlanJob` custom resource and lets a Go controller materialize the child `Job`.
@@ -164,4 +175,3 @@ kubectl describe careplanjob careplan-00000000000000000000000000000001
 ```
 
 The key invariant is idempotency: repeated reconciliation of one `CarePlanJob` must still produce only one child `Job`.
-
