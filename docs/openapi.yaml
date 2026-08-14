@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: CarePlan Django API
+  version: "1.0.0"
+  description: Explicit contract for the existing Django HTTP API.
+paths:
+  /api/care-plans/:
+    post:
+      summary: Submit a care plan for asynchronous generation
+      operationId: createCarePlan
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CarePlanCreateRequest"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/CarePlanCreateRequest"
+      responses:
+        "202":
+          description: Care plan was stored and queued for processing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CarePlanAcceptedResponse"
+        "503":
+          description: Care plan was stored but backend queue submission failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CarePlanDetail"
+  /api/care-plans/search/:
+    get:
+      summary: Search care plans
+      operationId: searchCarePlans
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+      responses:
+        "200":
+          description: Search results.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CarePlanSearchResponse"
+  /api/care-plans/{plan_id}/status/:
+    parameters:
+      - $ref: "#/components/parameters/PlanId"
+    get:
+      summary: Poll care plan generation status
+      operationId: getCarePlanStatus
+      responses:
+        "200":
+          description: Current care plan status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CarePlanStatusResponse"
+        "404":
+          description: Care plan was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundResponse"
+        "405":
+          description: Method is not allowed by the current plain Django view.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MethodNotAllowedResponse"
+  /api/care-plans/{plan_id}/download/:
+    parameters:
+      - $ref: "#/components/parameters/PlanId"
+    get:
+      summary: Download a care plan as plain text
+      operationId: downloadCarePlan
+      responses:
+        "200":
+          description: Plain text care plan export.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: Care plan was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundResponse"
+  /api/care-plans/{plan_id}/:
+    parameters:
+      - $ref: "#/components/parameters/PlanId"
+    get:
+      summary: Get care plan detail
+      operationId: getCarePlan
+      responses:
+        "200":
+          description: Care plan detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CarePlanDetail"
+        "404":
+          description: Care plan was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundResponse"
+components:
+  parameters:
+    PlanId:
+      name: plan_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    CarePlanStatus:
+      type: string
+      enum:
+        - pending
+        - processing
+        - completed
+        - failed
+    ListLikeString:
+      oneOf:
+        - type: array
+          items:
+            type: string
+        - type: string
+      description: The Django serializer accepts arrays and also splits comma-separated strings.
+    CarePlanCreateRequest:
+      type: object
+      additionalProperties: true
+      properties:
+        patient_first_name:
+          type: string
+          default: ""
+        patient_last_name:
+          type: string
+          default: ""
+        referring_provider:
+          type: string
+          default: ""
+        referring_provider_npi:
+          type: string
+          default: ""
+        patient_mrn:
+          type: string
+          default: ""
+        patient_primary_diagnosis:
+          type: string
+          default: ""
+        medication_name:
+          type: string
+          default: ""
+        additional_diagnosis:
+          $ref: "#/components/schemas/ListLikeString"
+        medication_history:
+          $ref: "#/components/schemas/ListLikeString"
+        patient_records:
+          type: string
+          default: ""
+    CarePlanAcceptedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+        - careplan_id
+        - status
+      properties:
+        message:
+          type: string
+          enum:
+            - Received
+        careplan_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/CarePlanStatus"
+    CarePlanDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - status
+        - history
+        - payload
+        - care_plan
+        - error
+        - queued_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/CarePlanStatus"
+        history:
+          type: array
+          items: {}
+        payload:
+          type: object
+          additionalProperties: true
+        care_plan:
+          type: object
+          nullable: true
+          additionalProperties: true
+        error:
+          type: string
+          nullable: true
+        queued_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    CarePlanStatusResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - status
+        - content
+        - error
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/CarePlanStatus"
+        content:
+          type: object
+          nullable: true
+          additionalProperties: true
+        error:
+          type: string
+          nullable: true
+    CarePlanSearchResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - query
+        - results
+      properties:
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarePlanDetail"
+    NotFoundResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          enum:
+            - not found
+    MethodNotAllowedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          enum:
+            - method not allowed

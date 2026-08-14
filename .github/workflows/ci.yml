@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - master
+      - dev
 
 jobs:
   test:
@@ -60,6 +61,12 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Run Django system checks
+        run: python manage.py check
+
+      - name: Validate OpenAPI contract
+        run: python scripts/validate_openapi.py
 
       - name: Run Django migrations
         run: python manage.py migrate --noinput

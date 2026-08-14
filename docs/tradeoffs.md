@@ -52,7 +52,7 @@ Avoid nested retries between the controller, the `Job`, and application code. Ce
 
 - AWS Lambdas in the practice module may still use stub handlers; full Django packaging on Lambda is incomplete.
 - Practice RDS is oriented toward learning, not production hardening.
-- Local Django HTTP API and AWS HTTP API paths are parallel surfaces, not yet a single deployed artifact.
+- The Django HTTP API now has an explicit OpenAPI contract guarded by CI, while AWS API Gateway remains a parallel surface rather than a single unified deployed API artifact.
 - Terraform state is local to the practice folder.
 - Cloud stack is ephemeral by policy.
 
@@ -61,6 +61,5 @@ Avoid nested retries between the controller, the `Job`, and application code. Ce
 - Package real handlers or container images for Lambda and share `careplans/` domain code end to end on AWS
 - Put Lambdas in a VPC; lock RDS to Lambda security groups; store DB credentials in Secrets Manager
 - Remote Terraform state and environment separation
-- Unify API contracts between Django and API Gateway where it makes sense
+- Unify Django and AWS API Gateway contracts where it makes sense; the Django contract is explicit and CI-protected, but cross-runtime contract unification remains future work
 - Observability on the cloud path beyond local logging
-
