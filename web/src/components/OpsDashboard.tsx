@@ -34,7 +34,8 @@ export function OpsDashboard() {
 
   useEffect(() => {
     let active = true;
-    void refresh()
+    void Promise.resolve()
+      .then(refresh)
       .catch((error: unknown) => {
         if (active) {
           setNotice({
