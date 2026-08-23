@@ -109,3 +109,19 @@ def render_care_plan_text(record):
         "",
     ]
     return "\n".join(lines)
+
+
+def ops_record_to_dict(record):
+    return {
+        "id": str(record.id),
+        "status": record.status,
+        "error": record.error,
+        "queued_at": record.queued_at.isoformat() if record.queued_at else None,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+        "manual_retry_count": record.manual_retry_count,
+        "last_manual_retry_at": (
+            record.last_manual_retry_at.isoformat() if record.last_manual_retry_at else None
+        ),
+        "stale": bool(getattr(record, "stale", False)),
+    }

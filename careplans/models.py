@@ -53,6 +53,8 @@ class CarePlan(models.Model):
     care_plan = models.JSONField(null=True, blank=True)
     error = models.TextField(null=True, blank=True)
     queued_at = models.DateTimeField(null=True, blank=True)
+    manual_retry_count = models.PositiveIntegerField(default=0)
+    last_manual_retry_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
