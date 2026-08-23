@@ -7,6 +7,7 @@ Two supported ways to run CarePlan: local Docker Compose, and a short-lived AWS 
 | Environment | Needs |
 |-------------|--------|
 | Local / Docker | Docker Desktop (or Compose), optional Python 3.x for non-Docker runs |
+| Next.js product UI | Node.js 22 and npm |
 | LLM (Gemini / Vertex) | GCP project, ADC via `gcloud auth application-default login`, `.env` with `GCP_PROJECT` / `GCP_LOCATION` |
 | AWS practice | AWS CLI credentials, [Terraform](https://www.terraform.io/) ≥ 1.5, password for RDS |
 
@@ -28,6 +29,21 @@ Services:
 | `redis` | Celery broker | `6379` |
 
 Open `http://127.0.0.1:8000/`.
+
+The same Compose command also starts the `frontend` service. Open `http://127.0.0.1:3000/` for the Next.js product interface. Inside Compose, `DJANGO_API_BASE_URL` is `http://web:8000`.
+
+### Product UI without Docker
+
+Start Django on port 8000, then run:
+
+```bash
+cd web
+cp .env.example .env.local
+npm ci
+npm run dev
+```
+
+The UI runs at `http://127.0.0.1:3000/`. Its server-only `DJANGO_API_BASE_URL` defaults to `http://127.0.0.1:8000`; it is not exposed to browser JavaScript.
 
 Optional monitoring profile (Prometheus / Grafana) is documented in Compose; enable only when needed.
 
