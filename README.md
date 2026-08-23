@@ -1,6 +1,6 @@
 # CarePlan
 
-Backend service that accepts pharmacy care-plan orders, generates plans asynchronously via an LLM, and exposes status for clients to poll.
+Full-stack product that accepts pharmacy care-plan requests, generates plans asynchronously via an LLM, and exposes typed status and result workflows. A Next.js/TypeScript product interface uses Node.js route handlers as a backend-for-frontend over the existing Django domain API.
 
 The same domain logic runs in three shapes:
 
@@ -17,6 +17,16 @@ The same domain logic runs in three shapes:
 | Kubernetes | Desired-state reconciliation | Kubernetes Job | Kubernetes-hosted workloads |
 
 ## Architecture
+
+The product request path is:
+
+```text
+Browser -> Next.js / TypeScript UI -> Node.js BFF -> Django API
+                                                   -> PostgreSQL
+                                                   -> ExecutionBackend -> Celery | Kubernetes
+```
+
+The browser calls same-origin Next.js routes. The Node layer validates Django responses with Zod, normalizes upstream failures, disables caching for mutable care-plan data, and forwards text downloads. Django remains the system of record and owns domain behavior.
 
 Cloud request path (practice infrastructure under `infra/practice/`):
 
@@ -65,6 +75,16 @@ Apply and destroy from that directory (requires AWS credentials and `TF_VAR_db_p
 
 ## Local Run
 
+Run the product interface after starting Django and Celery:
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+Open `http://127.0.0.1:3000/`. The existing Django UI and API remain at `http://127.0.0.1:8000/`.
+
 Terminal 1 (API):
 
 ```bash
@@ -84,7 +104,7 @@ Terminal 2 (Celery worker):
 celery -A careplan_mvp worker --loglevel=info
 ```
 
-Open `http://127.0.0.1:8000/`.
+Open `http://127.0.0.1:8000/` for the backend or legacy interface.
 
 The default execution backend is Celery. To set it explicitly:
 
@@ -98,7 +118,7 @@ set CAREPLAN_EXECUTION_BACKEND=celery
 docker compose up --build
 ```
 
-Starts `web`, Celery `worker`, PostgreSQL (`localhost:5432`), and Redis (`localhost:6379`).
+Starts Next.js `frontend` (`localhost:3000`), Django `web` (`localhost:8000`), Celery `worker`, PostgreSQL (`localhost:5432`), and Redis (`localhost:6379`).
 
 GCP credentials: Compose mounts your Windows Application Default Credentials into `web`/`worker` and sets `GOOGLE_APPLICATION_CREDENTIALS`. Ensure `.env` has `GCP_PROJECT` / `GCP_LOCATION`, and that you once ran:
 
@@ -119,6 +139,8 @@ TablePlus local connection:
 - `POST /api/care-plans/`
 - `GET /api/care-plans/<id>/`
 - `GET /api/care-plans/<id>/status/`
+- `GET /api/care-plans/search/?q=<query>`
+- `GET /api/care-plans/<id>/download/`
 
 The Django API contract is documented in [docs/openapi.yaml](docs/openapi.yaml).
 

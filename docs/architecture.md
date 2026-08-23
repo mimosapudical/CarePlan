@@ -4,6 +4,17 @@ CarePlan is a small backend for pharmacy care-plan generation. Domain logic live
 
 ## Runtime shapes
 
+### Product interface
+
+```text
+Browser -> Next.js UI -> Node.js route handlers -> Django API -> PostgreSQL
+                                                    -> ExecutionBackend
+```
+
+The TypeScript application under `web/` is a product client and backend-for-frontend, not a second domain backend. Browser requests remain same-origin. Node route handlers forward requests to Django, validate successful JSON at runtime with Zod, normalize connection errors, disable caching for mutable care-plan data, and preserve plain-text download headers. Django remains the system of record.
+
+After Django accepts a request, the interface polls every three seconds while status is `pending` or `processing` and stops at `completed` or `failed`. Poll timers are cleaned up when the active request changes or the component unmounts. Server code avoids logging patient payloads, MRNs, or generated plan content.
+
 ### Local / Docker
 
 ```text
@@ -67,4 +78,3 @@ Application packages under `careplans/` (models, services, generation, adapters,
 - [deployment.md](deployment.md) - how to run each shape
 - [tradeoffs.md](tradeoffs.md) - why async, Celery, Terraform, Kubernetes
 - [engineering-notes/day15.md](engineering-notes/day15.md) - IaC notes from Day 15
-
