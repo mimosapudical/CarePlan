@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OpsDashboard } from "@/components/OpsDashboard";
 
@@ -15,7 +15,10 @@ const record = (status: "failed" | "processing" | "completed" | "pending") => ({
   stale: false,
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("OpsDashboard", () => {
   it("renders Retry for a failed job", async () => {
