@@ -1,6 +1,9 @@
 import logging
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
+from django.db.models import BooleanField, Case, Q, Value, When
 from django.utils import timezone
 
 from .debug_trace import debug_break
@@ -214,3 +217,61 @@ def search_care_plans(query):
             results.append(record)
 
     return results
+
+
+def get_ops_care_plans(*, status=None, stale_minutes=30):
+    cutoff = timezone.now() - timedelta(minutes=stale_minutes)
+    operational_fields = (
+        "id", "status", "error", "queued_at", "created_at", "updated_at",
+        "manual_retry_count", "last_manual_retry_at",
+    )
+    queryset = CarePlan.objects.only(*operational_fields).annotate(
+        stale=Case(
+            When(
+                Q(status__in=[CarePlan.STATUS_PENDING, CarePlan.STATUS_PROCESSING])
+                & Q(updated_at__lt=cutoff),
+                then=Value(True),
+            ),
+            default=Value(False),
+            output_field=BooleanField(),
+        )
+    )
+    if status:
+        queryset = queryset.filter(status=status)
+    return queryset
+
+
+def retry_failed_care_plan(plan_id):
+    try:
+        with transaction.atomic():
+            record = CarePlan.objects.select_for_update().get(id=plan_id)
+            if record.status != CarePlan.STATUS_FAILED:
+                raise BlockError(
+                    "Only failed care-plan jobs can be retried",
+                    code="CAREPLAN_NOT_RETRYABLE",
+                )
+            backend = get_execution_backend()
+            retried_at = timezone.now()
+            record.status = CarePlan.STATUS_PENDING
+            record.error = None
+            record.history = [*record.history, CarePlan.STATUS_PENDING]
+            record.manual_retry_count += 1
+            record.last_manual_retry_at = retried_at
+            record.queued_at = retried_at
+            record.save(update_fields=[
+                "status", "error", "history", "manual_retry_count",
+                "last_manual_retry_at", "queued_at", "updated_at",
+            ])
+            try:
+                backend.submit(str(record.id))
+            except Exception as exc:
+                record.status = CarePlan.STATUS_FAILED
+                record.history = [*record.history, CarePlan.STATUS_FAILED]
+                record.error = f"Failed to resubmit care plan: {exc}"
+                record.save(update_fields=["status", "history", "error", "updated_at"])
+                logger.warning("manual care-plan retry submission failed careplan_id=%s", record.id)
+                return record, False
+            logger.info("manual care-plan retry queued careplan_id=%s", record.id)
+            return record, True
+    except (CarePlan.DoesNotExist, DjangoValidationError, ValueError):
+        return None, False

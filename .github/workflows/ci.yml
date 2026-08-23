@@ -95,6 +95,9 @@ jobs:
       - name: Run Django system checks
         run: python manage.py check
 
+      - name: Check Django migrations are current
+        run: python manage.py makemigrations --check
+
       - name: Validate OpenAPI contract
         run: python scripts/validate_openapi.py
 

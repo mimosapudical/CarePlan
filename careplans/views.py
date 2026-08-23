@@ -6,6 +6,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 from . import serializers, services
 from .debug_trace import debug_break
+from .exceptions import BlockError
+from .models import CarePlan
 
 
 def index(request):
@@ -88,3 +90,34 @@ def download_care_plan(request, plan_id):
     response["Content-Disposition"] = f'attachment; filename="care_plan_{plan_id}.txt"'
     response.write(serializers.render_care_plan_text(record))
     return response
+
+
+def get_ops_care_plans(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "method not allowed"}, status=405)
+    status = request.GET.get("status") or None
+    if status and status not in dict(CarePlan.STATUS_CHOICES):
+        return JsonResponse({"error": "invalid status"}, status=400)
+    try:
+        stale_minutes = int(request.GET.get("stale_minutes", "30"))
+        if stale_minutes < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "stale_minutes must be a positive integer"}, status=400)
+    records = services.get_ops_care_plans(status=status, stale_minutes=stale_minutes)
+    return JsonResponse({"results": [serializers.ops_record_to_dict(record) for record in records]})
+
+
+@csrf_exempt
+def retry_care_plan(request, plan_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "method not allowed"}, status=405)
+    try:
+        record, queued = services.retry_failed_care_plan(plan_id)
+    except BlockError:
+        return JsonResponse({"error": "Only failed care-plan jobs can be retried"}, status=409)
+    if record is None:
+        return JsonResponse({"error": "not found"}, status=404)
+    if not queued:
+        return JsonResponse({"error": "Care-plan retry could not be queued"}, status=503)
+    return JsonResponse(serializers.ops_record_to_dict(record), status=202)
