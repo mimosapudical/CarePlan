@@ -118,7 +118,7 @@ set CAREPLAN_EXECUTION_BACKEND=celery
 docker compose up --build
 ```
 
-Starts Next.js `frontend` (`localhost:3000`), Django `web` (`localhost:8000`), Celery `worker`, PostgreSQL (`localhost:5432`), and Redis (`localhost:6379`).
+Starts Next.js `frontend` (`localhost:3000`), Django `web` (`localhost:8000`), the Spring read API (`localhost:8080`), Celery `worker`, PostgreSQL (`localhost:5432`), and Redis (`localhost:6379`).
 
 GCP credentials: Compose mounts your Windows Application Default Credentials into `web`/`worker` and sets `GOOGLE_APPLICATION_CREDENTIALS`. Ensure `.env` has `GCP_PROJECT` / `GCP_LOCATION`, and that you once ran:
 
@@ -133,6 +133,39 @@ TablePlus local connection:
 - Database: `careplan`
 - User: `careplan`
 - Password: `careplan`
+
+## Incremental Spring Boot modernization
+
+`spring-careplan-api/` is a Java 21 + Spring Boot 3 modernization slice that initially owns only read-heavy CarePlan paths. Reads are a low-risk first boundary because both implementations can query the same Django-owned PostgreSQL rows while responses are checked for contract parity. Django remains the source of truth for `create_care_plan`, background generation, Celery execution, retries, and all write-side business logic, so the migration does not create two competing writers.
+
+The Spring service maps the existing `careplans_careplan` table, runs Hibernate in schema-validation mode, uses read-only transactions/connections, and does not expose create/update/delete endpoints. This keeps rollback simple: Django continues to serve its existing read endpoints in parallel while the Spring slice is verified.
+
+Run Django and Spring against the same database with Compose:
+
+```bash
+docker compose up -d postgres web spring-careplan-api
+```
+
+Django remains on `localhost:8000`; Spring listens on `localhost:8080`. Check Spring health with:
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+Set an existing CarePlan UUID and compare the semantic JSON returned by both implementations:
+
+```bash
+CAREPLAN_ID=<existing-careplan-uuid>
+
+curl "http://localhost:8000/api/care-plans/$CAREPLAN_ID/"
+curl "http://localhost:8080/api/v1/careplans/$CAREPLAN_ID"
+
+curl "http://localhost:8000/api/care-plans/$CAREPLAN_ID/status/"
+curl "http://localhost:8080/api/v1/careplans/$CAREPLAN_ID/status"
+
+curl "http://localhost:8000/api/ops/care-plans/?status=completed&stale_minutes=30"
+curl "http://localhost:8080/api/v1/ops/careplans?status=completed&stale_minutes=30"
+```
 
 ## API
 

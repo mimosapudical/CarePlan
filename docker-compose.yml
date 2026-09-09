@@ -35,6 +35,21 @@ services:
       - postgres
       - redis
 
+  spring-careplan-api:
+    build:
+      context: ./spring-careplan-api
+    ports:
+      - "8080:8080"
+    environment:
+      POSTGRES_DB: careplan
+      POSTGRES_USER: careplan
+      POSTGRES_PASSWORD: careplan
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    depends_on:
+      - postgres
+    restart: on-failure
+
   worker:
     build: .
     command: celery -A careplan_mvp worker --loglevel=info
